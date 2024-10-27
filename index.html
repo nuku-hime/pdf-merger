@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF結合ツール</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .file-list {
+            margin-bottom: 20px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 5px;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .remove-btn {
+            background-color: #dc3545;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        .remove-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF結合ツール</h1>
+        <div class="upload-area" id="dropZone">
+            <p>PDFファイルをドラッグ＆ドロップするか、クリックして選択してください</p>
+            <input type="file" id="fileInput" multiple accept=".pdf" style="display: none">
+            <button onclick="document.getElementById('fileInput').click()">ファイルを選択</button>
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <button id="mergeBtn" disabled onclick="mergePDFs()">PDFを結合</button>
+    </div>
+
+    <script>
+        let files = [];
+
+        // ドラッグ&ドロップの設定
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const mergeBtn = document.getElementById('mergeBtn');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#007bff';
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+            const newFiles = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
+            addFiles(newFiles);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const newFiles = Array.from(e.target.files);
+            addFiles(newFiles);
+            fileInput.value = '';
+        });
+
+        function addFiles(newFiles) {
+            files.push(...newFiles);
+            updateFileList();
+            updateMergeButton();
+        }
+
+        function removeFile(index) {
+            files.splice(index, 1);
+            updateFileList();
+            updateMergeButton();
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = files.map((file, index) => `
+                <div class="file-item">
+                    <span>${file.name}</span>
+                    <button class="remove-btn" onclick="removeFile(${index})">削除</button>
+                </div>
+            `).join('');
+        }
+
+        function updateMergeButton() {
+            mergeBtn.disabled = files.length < 2;
+        }
+
+        async function mergePDFs() {
+            try {
+                mergeBtn.disabled = true;
+                mergeBtn.textContent = '結合中...';
+
+                const PDFLib = window.PDFLib;
+                const mergedPdf = await PDFLib.PDFDocument.create();
+
+                for (const file of files) {
+                    const bytes = await file.arrayBuffer();
+                    const pdf = await PDFLib.PDFDocument.load(bytes);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                const mergedPdfFile = await mergedPdf.save();
+                download(mergedPdfFile, "merged.pdf", "application/pdf");
+
+                mergeBtn.textContent = 'PDFを結合';
+                mergeBtn.disabled = false;
+            } catch (error) {
+                console.error('PDF結合エラー:', error);
+                alert('PDFの結合中にエラーが発生しました。');
+                mergeBtn.textContent = 'PDFを結合';
+                mergeBtn.disabled = false;
+            }
+        }
+    </script>
+</div>
+</body>
+</html>
